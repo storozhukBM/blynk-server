@@ -1,13 +1,15 @@
 package cc.blynk.server.utils;
 
 import cc.blynk.server.exceptions.IllegalCommandException;
-import cc.blynk.server.model.UserProfile;
+import cc.blynk.server.model.Profile;
 import cc.blynk.server.model.auth.User;
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectReader;
+import com.fasterxml.jackson.databind.ObjectWriter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -21,10 +23,14 @@ import java.io.InputStream;
  */
 public final class JsonParser {
 
-    private static final Logger log = LogManager.getLogger(JsonParser.class);
-
     //it is threadsafe
-    private static final ObjectMapper mapper = init();
+    public static final ObjectMapper mapper = init();
+    private static final Logger log = LogManager.getLogger(JsonParser.class);
+    private static final ObjectReader userReader = mapper.reader(User.class);
+    private static final ObjectReader profileReader = mapper.reader(Profile.class);
+
+    private static final ObjectWriter userWriter = mapper.writerFor(User.class);
+    private static final ObjectWriter profileWriter = mapper.writerFor(Profile.class);
 
     private static ObjectMapper init() {
         return new ObjectMapper()
@@ -35,34 +41,41 @@ public final class JsonParser {
                 .setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY);
     }
 
-    public static String toJson(Object object) {
+    public static String toJson(User user) {
+        return toJson(userWriter, user);
+    }
+
+    public static String toJson(Profile profile) {
+        return toJson(profileWriter, profile);
+    }
+
+    private static String toJson(ObjectWriter writer, Object o) {
         try {
-            return mapper.writeValueAsString(object);
+            return writer.writeValueAsString(o);
         } catch (Exception e) {
-            log.error("Error jsoning object.");
-            log.error(e);
+            log.error("Error jsoning object.", e);
         }
         return "{}";
     }
 
     public static User parseUser(String reader) throws IOException {
-        User user = mapper.reader(User.class).readValue(reader);
+        User user = userReader.readValue(reader);
         user.initQuota();
         return user;
     }
 
-    public static UserProfile parseProfile(String reader, int id) {
+    public static Profile parseProfile(String reader, int id) {
         try {
-            return mapper.reader(UserProfile.class).readValue(reader);
+            return profileReader.readValue(reader);
         } catch (IOException e) {
             throw new IllegalCommandException("Error parsing user profile. Reason : " + e.getMessage(), id);
         }
     }
 
     //only for tests
-    public static UserProfile parseProfile(InputStream reader) {
+    public static Profile parseProfile(InputStream reader) {
         try {
-            return mapper.reader(UserProfile.class).readValue(reader);
+            return profileReader.readValue(reader);
         } catch (IOException e) {
             throw new IllegalCommandException("Error parsing user profile. Reason : " + e.getMessage(), 1);
         }
